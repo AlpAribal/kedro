@@ -4,7 +4,9 @@ of Kedro pipelines.
 from __future__ import annotations
 
 import copy
+import importlib
 import inspect
+import json
 import logging
 import re
 from collections import Counter
@@ -510,6 +512,35 @@ class Node:
         elif isinstance(inputs, dict):
             kwargs = inputs
         return args, kwargs
+
+    def to_json(self) -> str:
+        # TODO: how generic should we make this?
+        func_import_path = f"{self._func.__module__}.{self._func.__qualname__}"
+        return json.dumps(
+            {
+                "func": func_import_path,
+                "inputs": self._inputs,  # TODO: normalise into dictionary form?
+                "outputs": self._outputs,  # TODO: normalise into dictionary form?
+                "name": self._name,  # property 'name' prepends namespace to _name
+                "namespace": self.namespace,
+                "tags": sorted(self.tags),  # order of a set not guaranteed
+                "confirms": sorted(self.confirms),  # order of a set not guaranteed
+            }
+        )
+
+    @classmethod
+    def from_json(cls, json_string: str) -> Node:
+        data = json.loads(json_string)
+        module, fname = data["func"].rsplit(".", 1)
+        return cls(
+            func=getattr(importlib.import_module(module), fname),
+            inputs=data["inputs"],
+            outputs=data["outputs"],
+            name=data["name"],
+            namespace=data["namespace"],
+            tags=data["tags"],
+            confirms=data["confirms"],
+        )
 
 
 def _node_error_message(msg) -> str:
