@@ -514,8 +514,29 @@ class Node:
         return args, kwargs
 
     def dumps(self) -> str:
-        """Create a JSON representation of the node."""
-        func_import_path = f"{self._func.__module__}.{self._func.__qualname__}"
+        """Create a JSON representation of the node.
+
+        To ensure this representation can be loaded back in the same environment using
+        :py:meth:`kedro.pipeline.node.Node.loads`, the following constraints apply to
+        the node function:
+
+        - It cannot be a lambda function.
+        - It cannot be an inner function.
+        - It cannot be defined in ``__main__`` module.
+        """
+        err_msg = f"Cannot dump node '{self}'."
+        qualname = self._func.__qualname__
+        if qualname == "<lambda>":
+            raise ValueError(f"{err_msg} Its function is a lambda function.")
+
+        if "<inner>" in qualname:
+            raise ValueError(f"{err_msg} Its function is an inner function.")
+
+        module = self._func.__module__
+        if module == "__main__":
+            raise ValueError(f"{err_msg} Its function's module is __main__.")
+
+        func_import_path = f"{module}.{qualname}"
         return json.dumps(
             {
                 "func": func_import_path,
@@ -542,7 +563,9 @@ class Node:
         data = json.loads(json_string)
         func = pydoc.locate(data["func"])
         if func is None:
-            raise ValueError(f"Function cannot be imported: {data['func']}")
+            raise ValueError(f"Node function cannot be imported: {data['func']}")
+        if not callable(func):
+            raise ValueError(f"Node function is not callable: {data['func']}")
         return cls(
             func=func,
             inputs=data["inputs"],
