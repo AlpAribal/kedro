@@ -513,7 +513,7 @@ class Node:
             kwargs = inputs
         return args, kwargs
 
-    def to_json(self) -> str:
+    def dumps(self) -> str:
         """Create a JSON representation of the node."""
         func_import_path = f"{self._func.__module__}.{self._func.__qualname__}"
         return json.dumps(
@@ -537,7 +537,7 @@ class Node:
         )
 
     @classmethod
-    def from_json(cls, json_string: str) -> Node:
+    def loads(cls, json_string: str) -> Node:
         """Create a Node instance from a JSON string."""
         data = json.loads(json_string)
         func = pydoc.locate(data["func"])

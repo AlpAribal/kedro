@@ -39,23 +39,16 @@ def test_node_tojson() -> None:
         tags=["tag2", "tag1"],
         confirms=["b", "a"],
     )
-    assert n.to_json() == ", ".join(
-        [
-            '{"func": "tests.pipeline.test_serialisation.func"',
-            '"inputs": "my-input"',
-            '"outputs": "my-output"',
-            '"name": "my-name"',
-            '"namespace": "my-ns"',
-            '"tags": ["tag1", "tag2"]',
-            '"confirms": ["a", "b"]}',
-        ]
+    assert (
+        n.dumps()
+        == '{"func": "tests.pipeline.test_serialisation.func", "inputs": "my-input", "outputs": "my-output", "name": "my-name", "namespace": "my-ns", "tags": ["tag1", "tag2"], "confirms": ["a", "b"]}'
     )
 
 
 def test_node_roundtrip(node: Node) -> None:
     """Should end up with the very same Node after a JSON roundtrip."""
-    s = node.to_json()
-    new_node = Node.from_json(s)
+    s = node.dumps()
+    new_node = Node.loads(s)
 
     assert node is not new_node
     assert node == new_node
@@ -63,8 +56,8 @@ def test_node_roundtrip(node: Node) -> None:
 
 def test_node_result(node: Node) -> None:
     """The result of a node should remain the same after a JSON roundtrip."""
-    s = node.to_json()
-    new_node = Node.from_json(s)
+    s = node.dumps()
+    new_node = Node.loads(s)
 
     assert new_node.run({"a": 2}) == {"b": 4}
     assert new_node.run({"a": 3}) == {"b": 8}
@@ -76,17 +69,13 @@ def test_node_input_types() -> None:
     n1 = Node(func=func, inputs="random_name", outputs="b")
     n2 = Node(func=func, inputs=["random_name"], outputs="b")
     n3 = Node(func=func, inputs={"x": "random_name"}, outputs="b")
-    assert (
-        Node.from_json(n1.to_json())
-        == Node.from_json(n2.to_json())
-        == Node.from_json(n3.to_json())
-    )
+    assert Node.loads(n1.dumps()) == Node.loads(n2.dumps()) == Node.loads(n3.dumps())
 
 
 def test_pipe_roundtrip(pipe: Pipeline) -> None:
     """Should end up with the very same Pipeline after a JSON roundtrip."""
-    s = pipe.to_json()
-    new_pipe = Pipeline.from_json(s)
+    s = pipe.dumps()
+    new_pipe = Pipeline.loads(s)
 
     assert pipe is not new_pipe
     assert sorted(new_pipe.nodes) == sorted(pipe.nodes)
@@ -94,8 +83,8 @@ def test_pipe_roundtrip(pipe: Pipeline) -> None:
 
 def test_pipe_result(pipe: Pipeline) -> None:
     """The result of a pipeline should remain the same after a JSON roundtrip."""
-    s = pipe.to_json()
-    new_pipe = Pipeline.from_json(s)
+    s = pipe.dumps()
+    new_pipe = Pipeline.loads(s)
 
     cat = DataCatalog(feed_dict={"a": 2, "e": 3})
     exp = {
