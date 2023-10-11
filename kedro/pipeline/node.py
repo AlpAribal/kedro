@@ -4,10 +4,10 @@ of Kedro pipelines.
 from __future__ import annotations
 
 import copy
-import importlib
 import inspect
 import json
 import logging
+import pydoc
 import re
 from collections import Counter
 from typing import Any, Callable, Iterable
@@ -514,26 +514,37 @@ class Node:
         return args, kwargs
 
     def to_json(self) -> str:
-        # TODO: how generic should we make this?
+        """Create a JSON representation of the node."""
         func_import_path = f"{self._func.__module__}.{self._func.__qualname__}"
         return json.dumps(
             {
                 "func": func_import_path,
-                "inputs": self._inputs,  # TODO: normalise into dictionary form?
-                "outputs": self._outputs,  # TODO: normalise into dictionary form?
-                "name": self._name,  # property 'name' prepends namespace to _name
-                "namespace": self.namespace,
-                "tags": sorted(self.tags),  # order of a set not guaranteed
-                "confirms": sorted(self.confirms),  # order of a set not guaranteed
+                # using the original values of the instance variables in order not to
+                # lose information
+                # for example, self.inputs always returns a list, even if self._inputs
+                # is a dict
+                "inputs": self._inputs,
+                "outputs": self._outputs,
+                "name": self._name,  # property self.name prepends namespace to _name
+                "namespace": self._namespace,
+                # sorting tags and confirms to minimise diff between jsons, the order
+                # of them does not matter anyway
+                "tags": sorted(self._tags),
+                "confirms": sorted(self._confirms)
+                if isinstance(self._confirms, list)
+                else self._confirms,
             }
         )
 
     @classmethod
     def from_json(cls, json_string: str) -> Node:
+        """Create a Node instance from a JSON string."""
         data = json.loads(json_string)
-        module, fname = data["func"].rsplit(".", 1)
+        func = pydoc.locate(data["func"])
+        if func is None:
+            raise ValueError(f"Function cannot be imported: {data['func']}")
         return cls(
-            func=getattr(importlib.import_module(module), fname),
+            func=func,
             inputs=data["inputs"],
             outputs=data["outputs"],
             name=data["name"],
