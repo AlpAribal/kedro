@@ -39,16 +39,21 @@ def test_node_tojson() -> None:
         tags=["tag2", "tag1"],
         confirms=["b", "a"],
     )
-    assert (
-        n.dumps()
-        == '{"func": "tests.pipeline.test_serialisation.func", "inputs": "my-input", "outputs": "my-output", "name": "my-name", "namespace": "my-ns", "tags": ["tag1", "tag2"], "confirms": ["a", "b"]}'
-    )
+    assert n.to_dict() == {
+        "func": "tests.pipeline.test_serialisation.func",
+        "inputs": "my-input",
+        "outputs": "my-output",
+        "name": "my-name",
+        "namespace": "my-ns",
+        "tags": ["tag1", "tag2"],
+        "confirms": ["a", "b"],
+    }
 
 
 def test_node_roundtrip(node: Node) -> None:
     """Should end up with the very same Node after a JSON roundtrip."""
-    s = node.dumps()
-    new_node = Node.loads(s)
+    s = node.to_dict()
+    new_node = Node.from_dict(s)
 
     assert node is not new_node
     assert node == new_node
@@ -56,8 +61,8 @@ def test_node_roundtrip(node: Node) -> None:
 
 def test_node_result(node: Node) -> None:
     """The result of a node should remain the same after a JSON roundtrip."""
-    s = node.dumps()
-    new_node = Node.loads(s)
+    s = node.to_dict()
+    new_node = Node.from_dict(s)
 
     assert new_node.run({"a": 2}) == {"b": 4}
     assert new_node.run({"a": 3}) == {"b": 8}
@@ -69,7 +74,11 @@ def test_node_input_types() -> None:
     n1 = Node(func=func, inputs="random_name", outputs="b")
     n2 = Node(func=func, inputs=["random_name"], outputs="b")
     n3 = Node(func=func, inputs={"x": "random_name"}, outputs="b")
-    assert Node.loads(n1.dumps()) == Node.loads(n2.dumps()) == Node.loads(n3.dumps())
+    assert (
+        Node.from_dict(n1.to_dict())
+        == Node.from_dict(n2.to_dict())
+        == Node.from_dict(n3.to_dict())
+    )
 
 
 def test_pipe_roundtrip(pipe: Pipeline) -> None:
