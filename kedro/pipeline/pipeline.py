@@ -802,11 +802,11 @@ class Pipeline:  # noqa: too-many-public-methods
 
     @classmethod
     def loads(cls, json_str: str) -> Pipeline:
-        nodes_as_str = json.loads(json_str)["nodes"]
-        return cls(nodes=[Node.loads(n_str) for n_str in nodes_as_str])
+        nodes_as_dicts = json.loads(json_str)["nodes"]
+        return cls(nodes=[Node.from_dict(n_dict) for n_dict in nodes_as_dicts])
 
     def dumps(self) -> str:
-        return json.dumps({"nodes": [n.dumps() for n in self._nodes]})
+        return json.dumps({"nodes": [n.to_dict() for n in self._nodes]})
 
 
 def _validate_duplicate_nodes(nodes_or_pipes: Iterable[Node | Pipeline]):

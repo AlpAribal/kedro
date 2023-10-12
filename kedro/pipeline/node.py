@@ -5,12 +5,11 @@ from __future__ import annotations
 
 import copy
 import inspect
-import json
 import logging
 import pydoc
 import re
 from collections import Counter
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, TypedDict
 from warnings import warn
 
 from more_itertools import spy, unzip
@@ -513,18 +512,18 @@ class Node:
             kwargs = inputs
         return args, kwargs
 
-    def dumps(self) -> str:
-        """Create a JSON representation of the node.
+    def to_dict(self) -> NodeAsDict:
+        """Create a dictionary representation of the node suitable for dumping to JSON.
 
         To ensure this representation can be loaded back in the same environment using
-        :py:meth:`kedro.pipeline.node.Node.loads`, the following constraints apply to
-        the node function:
+        :py:meth:`kedro.pipeline.node.Node.from_dict`, the following constraints apply
+        to the node function:
 
         - It cannot be a lambda function.
         - It cannot be an inner function.
         - It cannot be defined in ``__main__`` module.
         """
-        err_msg = f"Cannot dump node '{self}'."
+        err_msg = f"Cannot convert node '{self}' to dict."
         qualname = self._func.__qualname__
         if qualname == "<lambda>":
             raise ValueError(f"{err_msg} Its function is a lambda function.")
@@ -536,45 +535,59 @@ class Node:
         if module == "__main__":
             raise ValueError(f"{err_msg} Its function's module is __main__.")
 
-        func_import_path = f"{module}.{qualname}"
-        return json.dumps(
-            {
-                "func": func_import_path,
-                # using the original values of the instance variables in order not to
-                # lose information
-                # for example, self.inputs always returns a list, even if self._inputs
-                # is a dict
-                "inputs": self._inputs,
-                "outputs": self._outputs,
-                "name": self._name,  # property self.name prepends namespace to _name
-                "namespace": self._namespace,
-                # sorting tags and confirms to minimise diff between jsons, the order
-                # of them does not matter anyway
-                "tags": sorted(self._tags),
-                "confirms": sorted(self._confirms)
-                if isinstance(self._confirms, list)
-                else self._confirms,
-            }
-        )
+        return {
+            "func": f"{self._func.__module__}.{self._func.__qualname__}",
+            # using the original values of the instance variables in order not to
+            # lose information
+            # for example, self.inputs always returns a list, even if self._inputs
+            # is a dict
+            "inputs": self._inputs,
+            "outputs": self._outputs,
+            "name": self._name,  # property self.name prepends namespace to _name
+            "namespace": self._namespace,
+            # sorting tags and confirms to minimise diff between jsons, the order
+            # of them does not matter anyway
+            "tags": sorted(self._tags),
+            "confirms": sorted(self._confirms)
+            if isinstance(self._confirms, list)
+            else self._confirms,
+        }
 
     @classmethod
-    def loads(cls, json_string: str) -> Node:
-        """Create a Node instance from a JSON string."""
-        data = json.loads(json_string)
-        func = pydoc.locate(data["func"])
+    def from_dict(cls, dct: NodeAsDict) -> Node:
+        """Create a Node instance from its dictionary form."""
+        func = pydoc.locate(dct["func"])
         if func is None:
-            raise ValueError(f"Node function cannot be imported: {data['func']}")
+            raise ValueError(f"Node function cannot be imported: {dct['func']}")
         if not callable(func):
-            raise ValueError(f"Node function is not callable: {data['func']}")
+            raise ValueError(f"Node function is not callable: {dct['func']}")
+
         return cls(
             func=func,
-            inputs=data["inputs"],
-            outputs=data["outputs"],
-            name=data["name"],
-            namespace=data["namespace"],
-            tags=data["tags"],
-            confirms=data["confirms"],
+            inputs=dct["inputs"],
+            outputs=dct["outputs"],
+            name=dct["name"],
+            namespace=dct["namespace"],
+            tags=dct["tags"],
+            confirms=dct["confirms"],
         )
+
+
+class NodeAsDict(TypedDict):
+    """A dictionary representation of a Node.
+
+    In this dictionary, the function is represented as a string via its full import
+    path.
+    This is useful when serialising a Node to JSON and then loading it back.
+    """
+
+    func: str
+    inputs: None | str | list[str] | dict[str, str]
+    outputs: None | str | list[str] | dict[str, str]
+    name: str | None
+    tags: str | Iterable[str] | None
+    confirms: str | list[str] | None
+    namespace: str | None
 
 
 def _node_error_message(msg) -> str:
